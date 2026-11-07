@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lima de a dos 💜</title>
+<link rel="icon" href="data:,">
+<style>
+@font-face{font-family:'VT323';src:url('vendor/fonts/vt323-latin-400-normal.woff2') format('woff2');font-display:block}
+@font-face{font-family:'PS2P';src:url('vendor/fonts/press-start-2p-latin-400-normal.woff2') format('woff2');font-display:block}
+:root{--ink:#2b1b30;--paper:#fff3d6;--pink:#ff7aa8;--purple:#8a5cf6;--ice:#bfeaff;--gold:#ffd24a;--mint:#7fd1ae}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#120a22;overflow:hidden;font-family:'VT323',monospace;color:var(--ink)}
+#game{position:fixed;inset:0}
+#game canvas{image-rendering:pixelated;image-rendering:crisp-edges}
+#ui{position:fixed;inset:0;pointer-events:none;font-size:22px}
+#ui > *{pointer-events:auto}
+.hidden{display:none!important}
+.px{font-family:'PS2P',monospace;letter-spacing:0}
+
+/* paneles y botones estilo pixel */
+.panel{background:var(--paper);border:4px solid var(--ink);box-shadow:5px 5px 0 rgba(0,0,0,.45),inset 0 0 0 3px #fff9e8;padding:14px 18px;border-radius:4px}
+.btn{font:inherit;font-size:24px;color:var(--ink);background:var(--pink);border:4px solid var(--ink);box-shadow:0 5px 0 var(--ink);padding:6px 16px;cursor:pointer;border-radius:4px;margin:4px;transition:transform .05s}
+.btn:hover{filter:brightness(1.08)}
+.btn:active{transform:translateY(4px);box-shadow:0 1px 0 var(--ink)}
+.btn.alt{background:var(--ice)} .btn.go{background:var(--mint)} .btn.gold{background:var(--gold)} .btn.small{font-size:19px;padding:2px 10px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn.on{background:var(--gold);outline:3px solid var(--purple)}
+input[type=text],input[type=number]{font:inherit;font-size:26px;padding:4px 10px;border:4px solid var(--ink);background:#fff;color:var(--ink);border-radius:4px;width:100%}
+.screen{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:10px}
+.screen h1{font-family:'PS2P',monospace;font-size:clamp(18px,3.4vw,34px);color:#fff;text-shadow:4px 4px 0 var(--ink),-2px -2px 0 var(--purple);margin:0 0 6px;line-height:1.35}
+.screen .sub{color:#fff;font-size:26px;text-shadow:2px 2px 0 var(--ink);margin-bottom:18px}
+.cards{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin:10px 0}
+.card{width:210px;cursor:pointer;text-align:center}
+.card.sel{background:#ffe9a8;outline:5px solid var(--purple)}
+.card canvas{display:block;margin:0 auto 4px}
+.code{font-family:'PS2P',monospace;font-size:34px;letter-spacing:6px;background:var(--ink);color:var(--gold);padding:12px 18px;display:inline-block;border-radius:4px;margin:8px 0}
+.small-note{font-size:19px;opacity:.8;max-width:520px}
+.err{color:#b3123b}
+.row{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap}
+
+/* HUD */
+#hud{position:absolute;left:0;right:0;top:0;display:flex;justify-content:space-between;align-items:flex-start;padding:8px;pointer-events:none}
+#hud > *{pointer-events:auto}
+.who{display:flex;gap:6px;align-items:center;background:rgba(43,27,48,.82);color:#fff;border:3px solid var(--ink);padding:3px 8px;border-radius:4px;font-size:20px}
+.who canvas{width:30px;height:auto;image-rendering:pixelated}
+.who .dot{width:10px;height:10px;border-radius:50%;background:#5cff8a;display:inline-block;margin-left:4px}
+.who.off .dot{background:#ff5c6c}
+#score{background:rgba(255,243,214,.95);border:4px solid var(--ink);box-shadow:0 4px 0 rgba(0,0,0,.4);padding:3px 12px;border-radius:4px;min-width:260px;text-align:center;line-height:1.05}
+#score .bar{height:12px;background:#ddd;border:3px solid var(--ink);position:relative;margin-top:2px}
+#score .bar i{position:absolute;top:0;bottom:0;background:var(--pink)}
+#score .bar b{position:absolute;left:50%;top:-3px;bottom:-3px;width:3px;background:var(--ink)}
+#hudr{display:flex;gap:6px}
+#c4{position:absolute;left:8px;bottom:8px;background:rgba(43,27,48,.85);color:#fff;border:3px solid var(--ink);padding:3px 10px;border-radius:4px;font-size:20px;pointer-events:auto}
+#c4 b{color:var(--gold)}
+#emotes{position:absolute;right:8px;bottom:8px;display:flex;gap:4px;background:rgba(43,27,48,.85);border:3px solid var(--ink);padding:4px;border-radius:4px}
+#emotes button{background:#fff3d6;border:3px solid var(--ink);padding:2px;cursor:pointer;border-radius:3px;line-height:0}
+#emotes button:hover{background:var(--gold)}
+#emotes canvas{width:26px;height:26px;image-rendering:pixelated}
+#chat{position:absolute;left:8px;bottom:50px;width:min(360px,60vw);pointer-events:none}
+#chatlog{display:flex;flex-direction:column;gap:2px;margin-bottom:4px}
+#chatlog div{background:rgba(43,27,48,.8);color:#fff;padding:1px 8px;border-radius:3px;font-size:21px;width:fit-content;max-width:100%;word-break:break-word;transition:opacity .6s}
+#chatlog div b{color:var(--gold)}
+#chat input{pointer-events:auto;font-size:21px;padding:2px 8px;border-width:3px;display:none}
+#chat.open input{display:block}
+#chat .hint{white-space:nowrap;color:#fff;font-size:18px;text-shadow:1px 1px 0 var(--ink);opacity:.8}
+#toast{position:absolute;top:70px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:6px 16px;border:3px solid var(--gold);border-radius:4px;font-size:24px;pointer-events:none;opacity:0;transition:opacity .3s;max-width:80vw;text-align:center}
+#toast.show{opacity:1}
+#pause{position:absolute;inset:0;background:rgba(18,10,34,.86);display:flex;align-items:center;justify-content:center;flex-direction:column;color:#fff;text-align:center;z-index:50}
+#pause h2{font-family:'PS2P',monospace;font-size:20px;line-height:1.5;margin:0 0 10px}
+.spin{width:36px;height:36px;border:6px solid #fff3;border-top-color:var(--gold);border-radius:50%;animation:sp 1s linear infinite;margin:12px}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* modal (clóset / ajustes) */
+.modal{position:absolute;inset:0;background:rgba(18,10,34,.7);display:flex;align-items:center;justify-content:center;z-index:20;padding:10px}
+.modal .panel{width:min(940px,96vw);max-height:94vh;overflow:auto;position:relative}
+.modal h2{font-family:'PS2P',monospace;font-size:16px;margin:0 0 8px}
+.xbtn{position:absolute;right:8px;top:8px}
+.closet{display:flex;gap:16px;flex-wrap:wrap}
+.pv{flex:0 0 250px;text-align:center;background:linear-gradient(#cdeeff,#eaf8ff);border:4px solid var(--ink);padding:10px;border-radius:4px}
+.pv .views{display:flex;justify-content:center;align-items:flex-end;gap:2px;flex-wrap:wrap}
+.pv .name{font-family:'PS2P',monospace;font-size:12px;margin:6px 0}
+.opts{flex:1;min-width:300px}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}
+.tab{font:inherit;font-size:21px;padding:2px 10px;border:3px solid var(--ink);background:#e9dcc0;cursor:pointer;border-radius:4px 4px 0 0}
+.tab.on{background:var(--pink)}
+.grp{margin:6px 0}
+.grp label{display:block;font-size:20px;margin-bottom:2px;opacity:.85}
+.sw{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.sw button{width:30px;height:30px;border:3px solid var(--ink);cursor:pointer;border-radius:3px;padding:0}
+.sw button.on{outline:4px solid var(--purple);outline-offset:1px}
+.sw input[type=color]{width:34px;height:34px;border:3px solid var(--ink);padding:0;background:none;cursor:pointer}
+.chips{display:flex;gap:4px;flex-wrap:wrap}
+.chips .btn{margin:0;font-size:19px;padding:2px 9px;box-shadow:0 3px 0 var(--ink)}
+.lockd{opacity:.5}
+.rec table{border-collapse:collapse;width:100%;font-size:20px}
+.rec td,.rec th{border-bottom:2px dotted #b9a98a;padding:2px 6px;text-align:center}
+.rec td:first-child,.rec th:first-child{text-align:left}
+input[type=range]{width:200px}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="ui">
+  <div id="screens"></div>
+  <div id="hud" class="hidden"></div>
+  <div id="c4" class="hidden"></div>
+  <div id="chat" class="hidden"><div id="chatlog"></div><input id="chatinput" type="text" maxlength="90" placeholder="Escribe y Enter…" autocomplete="off"><div class="hint">Enter chat · 1-7 emotes · flechas · E usar</div></div>
+  <div id="emotes" class="hidden"></div>
+  <div id="toast"></div>
+  <div id="pause" class="hidden"></div>
+</div>
+
+<script src="vendor/phaser.min.js"></script>
+<script src="vendor/peerjs.min.js"></script>
+<script src="src/config.js"></script>
+<script src="src/kitchen_sim.js"></script>
+<script src="src/pollos_sim.js"></script>
+<script src="src/connect4_sim.js"></script>
+<script src="src/jitsu_sim.js"></script>
+<script src="src/state.js"></script>
+<script src="src/sprites.js"></script>
+<script src="src/audio.js"></script>
+<script src="src/net.js"></script>
+<script src="src/ui.js"></script>
+<script src="src/scenes/menu.js"></script>
+<script src="src/scenes/story.js"></script>
+<script src="src/scenes/igloo.js"></script>
+<script src="src/scenes/map.js"></script>
+<script src="src/scenes/place.js"></script>
+<script src="src/scenes/kennedy.js"></script>
+<script src="src/scenes/pucp.js"></script>
+<script src="src/scenes/cocina_art.js"></script>
+<script src="src/scenes/cocina.js"></script>
+<script src="src/scenes/martuccini.js"></script>
+<script src="src/scenes/mg.js"></script>
+<script src="src/scenes/pollos.js"></script>
+<script src="src/scenes/saoco.js"></script>
+<script src="src/scenes/conecta4.js"></script>
+<script src="src/scenes/cardjitsu.js"></script>
+<script src="src/scenes/fin.js"></script>
+<script src="src/scenes/playa.js"></script>
+<script src="src/scenes/yuyos.js"></script>
+<script src="src/scenes/foto.js"></script>
+<script src="src/main.js"></script>
+</body>
+</html>

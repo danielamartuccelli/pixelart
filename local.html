@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lima de a dos · misma laptop</title>
+<style>
+  html,body{margin:0;height:100%;background:#120a22;color:#fff3d6;font-family:'Trebuchet MS',Verdana,sans-serif;overflow:hidden}
+  #top{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 10px;background:#2b1b30;border-bottom:2px solid #ffd24a;height:34px;box-sizing:border-box}
+  #top b{color:#ffd24a;letter-spacing:1px}
+  #top button{background:#ff7aa8;border:2px solid #2b1b30;border-radius:5px;font-weight:bold;cursor:pointer;padding:2px 8px;color:#2b1b30}
+  #stage{display:flex;height:calc(100% - 34px - 58px)}
+  #stage.v{flex-direction:column}
+  .pane{flex:1;display:flex;align-items:center;justify-content:center;min-width:0;min-height:0;position:relative}
+  .pane+.pane{border-left:2px solid #ffd24a}
+  #stage.v .pane+.pane{border-left:0;border-top:2px solid #ffd24a}
+  .pane iframe{border:0;width:100%;height:100%;display:block}
+  .tag{position:absolute;left:6px;bottom:4px;font-size:12px;background:#2b1b30cc;padding:1px 6px;border-radius:4px;pointer-events:none}
+  #help{height:58px;box-sizing:border-box;display:flex;gap:14px;padding:4px 10px;background:#2b1b30;border-top:2px solid #ffd24a;font-size:13px;line-height:1.25}
+  #help div{flex:1}
+  kbd{background:#fff3d6;color:#2b1b30;border-radius:3px;padding:0 4px;font-weight:bold;font-size:12px}
+  .pad{color:#9fe0cf}
+</style>
+</head>
+<body>
+<div id="top">
+  <span><b>LIMA DE A DOS</b> · misma laptop (2 jugadores)</span>
+  <span id="padinfo" class="pad">🎮 sin mandos: se juega con el teclado</span>
+  <span><button id="lay">⇄ Pantallas: lado a lado</button> <button id="fs">⛶ Pantalla completa</button></span>
+</div>
+<div id="stage">
+  <div class="pane"><iframe id="f0" allow="autoplay; gamepad" src="index.html?local=1&slot=0&me=sebas"></iframe><span class="tag">Jugador 1 · Sebastián</span></div>
+  <div class="pane"><iframe id="f1" allow="autoplay; gamepad" src="index.html?local=1&slot=1&me=dani"></iframe><span class="tag">Jugador 2 · Daniela</span></div>
+</div>
+<div id="help">
+  <div><b>Jugador 1 (Sebas):</b> mover <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · acción / saltar / lanzar <kbd>F</kbd> · usar / golpear <kbd>E</kbd> · libreta <kbd>Q</kbd> · cartas <kbd>1</kbd>–<kbd>5</kbd><br><span class="pad">Mando 1: palanca o cruceta · A = acción · X = usar · Y = libreta</span></div>
+  <div><b>Jugador 2 (Dani):</b> mover <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> · acción / saltar / lanzar <kbd>Enter</kbd> · usar / golpear <kbd>Shift der.</kbd> · libreta <kbd>.</kbd> · cartas <kbd>Num 1</kbd>–<kbd>5</kbd><br><span class="pad">Mando 2: palanca o cruceta · A = acción · X = usar · Y = libreta</span></div>
+</div>
+<script>
+(function () {
+  const F = [document.getElementById('f0'), document.getElementById('f1')];
+  const up = [false, false];
+  /* --- puente de mensajes: lo que manda una copia le llega a la otra --- */
+  window.addEventListener('message', e => {
+    const m = e.data; if (!m || !m.lima) return;
+    const from = m.from, to = 1 - from;
+    if (m.sys === 'hi') { up[from] = true; if (up[0] && up[1]) F.forEach(f => f.contentWindow.postMessage({ lima: 1, sys: 'peer', up: true }, '*')); return; }
+    if (m.sys === 'key') { handleKey(m.type, m.code); return; }
+    if (m.t) F[to].contentWindow.postMessage({ lima: 1, t: m.t, d: m.d }, '*');
+  });
+
+  /* --- teclado: cada tecla física pertenece a un jugador y se traduce a las teclas del juego --- */
+  const KC = { ArrowUp: 38, ArrowDown: 40, ArrowLeft: 37, ArrowRight: 39, Space: 32, KeyE: 69, KeyQ: 81, Digit1: 49, Digit2: 50, Digit3: 51, Digit4: 52, Digit5: 53, Escape: 27 };
+  const KEYNAME = { Space: ' ', KeyE: 'e', KeyQ: 'q' };
+  const MAP = [   // jugador 1 (izquierda) y jugador 2 (derecha)
+    { KeyW: 'ArrowUp', KeyA: 'ArrowLeft', KeyS: 'ArrowDown', KeyD: 'ArrowRight', KeyF: 'Space', KeyE: 'KeyE', KeyQ: 'KeyQ', Digit1: 'Digit1', Digit2: 'Digit2', Digit3: 'Digit3', Digit4: 'Digit4', Digit5: 'Digit5' },
+    { ArrowUp: 'ArrowUp', ArrowLeft: 'ArrowLeft', ArrowDown: 'ArrowDown', ArrowRight: 'ArrowRight', Enter: 'Space', NumpadEnter: 'Space', ShiftRight: 'KeyE', Period: 'KeyQ', Numpad1: 'Digit1', Numpad2: 'Digit2', Numpad3: 'Digit3', Numpad4: 'Digit4', Numpad5: 'Digit5' }
+  ];
+  const held = [{}, {}];   // held[jugador]['codigo#k'|'codigo#g'] = teclado / mando (para que no se pisen)
+  function send(p, type, code) {
+    const w = F[p].contentWindow; if (!w) return; const kc = KC[code]; if (!kc) return;
+    const key = KEYNAME[code] || code, ev = new w.KeyboardEvent(type, { key, code, keyCode: kc, which: kc, bubbles: true, cancelable: true });
+    try { Object.defineProperty(ev, 'keyCode', { get: () => kc }); Object.defineProperty(ev, 'which', { get: () => kc }); } catch (x) { }
+    w.dispatchEvent(ev);
+  }
+  function press(p, code, down, src) {
+    const k = code + '#' + src; if (down === !!held[p][k]) return; held[p][k] = down;
+    const any = held[p][code + '#k'] || held[p][code + '#g'];
+    if (down) send(p, 'keydown', code); else if (!any) send(p, 'keyup', code);
+  }
+  function handleKey(type, physical) { const down = type === 'keydown'; for (let p = 0; p < 2; p++) { const g = MAP[p][physical]; if (g) press(p, g, down, 'k'); } }
+  function onKey(e) { if (MAP[0][e.code] || MAP[1][e.code]) { e.preventDefault(); if (!e.repeat) handleKey(e.type, e.code); } }
+  window.addEventListener('keydown', onKey); window.addEventListener('keyup', onKey);
+  window.addEventListener('blur', () => { for (let p = 0; p < 2; p++) Object.keys(held[p]).forEach(k => { if (held[p][k]) { const i = k.indexOf('#'); press(p, k.slice(0, i), false, k.slice(i + 1)); } }); });
+
+  /* --- mandos (Gamepad API): el 1.º mando es del jugador 1 y el 2.º del jugador 2 --- */
+  const pad = [{}, {}];
+  function poll() {
+    const gps = (navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean) : []);
+    document.getElementById('padinfo').textContent = gps.length ? '🎮 ' + gps.length + ' mando(s) conectado(s)' : '🎮 sin mandos: se juega con el teclado';
+    gps.slice(0, 2).forEach((g, i) => {
+      const ax = g.axes[0] || 0, ay = g.axes[1] || 0, b = n => g.buttons[n] && g.buttons[n].pressed;
+      const st = { ArrowLeft: ax < -0.5 || b(14), ArrowRight: ax > 0.5 || b(15), ArrowUp: ay < -0.5 || b(12), ArrowDown: ay > 0.5 || b(13), Space: b(0), KeyE: b(2) || b(1), KeyQ: b(3) };
+      Object.keys(st).forEach(c => { if (!!pad[i][c] !== st[c]) { pad[i][c] = st[c]; press(i, c, st[c], 'g'); } });
+    });
+    requestAnimationFrame(poll);
+  }
+  requestAnimationFrame(poll);
+
+  /* --- botones de arriba --- */
+  const stage = document.getElementById('stage'), lay = document.getElementById('lay');
+  lay.onclick = () => { stage.classList.toggle('v'); lay.textContent = '⇄ Pantallas: ' + (stage.classList.contains('v') ? 'arriba y abajo' : 'lado a lado'); };
+  document.getElementById('fs').onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); };
+})();
+</script>
+</body>
+</html>
